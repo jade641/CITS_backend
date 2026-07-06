@@ -33,10 +33,6 @@ COPY --chown=www-data:www-data . /var/www/html
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Generate optimized autoload files
-RUN php artisan config:clear && \
-    php artisan cache:clear
-
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
@@ -57,10 +53,10 @@ export APACHE_PORT=${PORT:-80}\n\
 # Update Apache ports\n\
 sed -i "s/Listen .*/Listen ${APACHE_PORT}/" /etc/apache2/ports.conf\n\
 sed -i "s/<VirtualHost .*>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/sites-available/000-default.conf\n\
-# Cache configs\n\
-php artisan config:cache\n\
-php artisan route:cache\n\
-php artisan view:cache\n\
+# Cache configs only if database is available\n\
+php artisan config:cache || echo "Skipping config cache"\n\
+php artisan route:cache || echo "Skipping route cache"\n\
+php artisan view:cache || echo "Skipping view cache"\n\
 # Start Apache\n\
 apache2-foreground' > /usr/local/bin/start.sh && \
     chmod +x /usr/local/bin/start.sh
