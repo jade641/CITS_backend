@@ -6,14 +6,33 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
+      - key: APP_NAME
+        value: "Cyber Incident Ticketing System"
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
         value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        value: https://cits-backend-s12z.onrender.com
+      - key: FRONTEND_URL
+        value: YOUR_FRONTEND_URL_HERE
+        # Example: https://your-frontend.vercel.app or https://your-frontend.netlify.app
       - key: LOG_CHANNEL
         value: stderr
+      - key: LOG_LEVEL
+        value: error
       - key: SESSION_DRIVER
         value: cookie
+      - key: SESSION_LIFETIME
+        value: "120"
+      - key: SESSION_ENCRYPT
+        value: "false"
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: SESSION_SAME_SITE
+        value: none
       - key: CACHE_DRIVER
         value: file
       - key: CACHE_STORE
@@ -22,3 +41,20 @@ services:
         value: sync
       - key: FILESYSTEM_DISK
         value: local
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: SANCTUM_STATEFUL_DOMAINS
+        value: YOUR_FRONTEND_DOMAIN_HERE
+        # Example: your-frontend.vercel.app (without https://)
+      - key: MAIL_MAILER
+        value: log

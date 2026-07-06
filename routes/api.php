@@ -19,9 +19,26 @@ use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
+    $dbStatus = 'unknown';
+    $dbMessage = '';
+    
+    try {
+        \Illuminate\Support\Facades\DB::connection()->getPdo();
+        $dbStatus = 'connected';
+        $dbMessage = 'Database connection successful';
+    } catch (\Exception $e) {
+        $dbStatus = 'error';
+        $dbMessage = 'Database connection failed: ' . $e->getMessage();
+    }
+    
     return response()->json([
         'status' => 'ok',
         'application' => config('app.name'),
+        'environment' => config('app.env'),
+        'database' => [
+            'status' => $dbStatus,
+            'message' => $dbMessage,
+        ],
     ]);
 });
 
