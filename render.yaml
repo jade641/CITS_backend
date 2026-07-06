@@ -17,7 +17,7 @@ services:
       - key: APP_URL
         value: https://cits-backend-s12z.onrender.com
       - key: FRONTEND_URL
-        value: YOUR_FRONTEND_URL_HERE
+        value: https://cits-frontend-mu.vercel.app
         # Example: https://your-frontend.vercel.app or https://your-frontend.netlify.app
       - key: LOG_CHANNEL
         value: stderr
