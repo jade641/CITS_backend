@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+
+# Environment files (will be set via Render env vars)
+.env
+
+# Node modules (not needed for backend)
+node_modules
+
+# Build artifacts
+public/build
+public/hot
+
+# Testing
+tests
+phpunit.xml
+.phpunit.result.cache
+
+# Documentation
+README.md
+*.md
+docs
+
+# Logs
+storage/logs/*.log
+
+# Temporary files
+*.log
+*.tmp
+*.cache
