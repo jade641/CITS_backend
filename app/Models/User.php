@@ -128,6 +128,11 @@ class User extends Authenticatable
         return $this->roles->sortBy('id')->first()?->slug;
     }
 
+    public function isSocAnalyst(): bool
+    {
+        return $this->hasAnyRole(['administrator', 'security-analyst']);
+    }
+
     /**
      * @return array<int, string>
      */
@@ -142,13 +147,8 @@ class User extends Authenticatable
             ->all();
     }
 
-    public function isSocAnalyst(): bool
-    {
-        return in_array($this->role, ['Analyst', 'Admin']);
-    }
-
     public function isSocSupervisor(): bool
     {
-        return $this->role === 'Admin';
+        return $this->hasAnyRole(['administrator']);
     }
 }
