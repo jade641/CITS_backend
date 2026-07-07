@@ -1,0 +1,69 @@
+================================================================================
+DOCKER BUILD FIX - Database Dependency Issue Resolved
+================================================================================
+
+PROBLEM:
+--------
+Docker build was failing during:
+  RUN php artisan config:clear && php artisan cache:clear
+
+Error:
+  "Database file at path [/var/www/html/database/database.sqlite] does not exist"
+
+ROOT CAUSE:
+-----------
+1. Default .env.example uses SQLite (DB_CONNECTION=sqlite)
+2. SESSION_DRIVER=database, CACHE_STORE=database required database connection
+3. During Docker BUILD, no database is available yet
+4. The artisan commands tried to connect to database and failed
+
+SOLUTION APPLIED:
+-----------------
+1. ✅ Removed database-dependent artisan commands from Dockerfile BUILD phase
+2. ✅ Moved artisan commands to RUNTIME (start.sh script)
+3. ✅ Added error handling (|| echo "Skipping...") for runtime commands
+4. ✅ Updated render.yaml with file-based session/cache drivers:
+   - SESSION_DRIVER=cookie
+   - CACHE_DRIVER=file
+   - CACHE_STORE=file
+   - QUEUE_CONNECTION=sync
+
+CHANGES MADE:
+-------------
+Dockerfile (Lines 36-48):
+  - Removed: RUN php artisan config:clear && php artisan cache:clear
+  - Added error handling in start.sh:
+    php artisan config:cache || echo "Skipping config cache"
+    php artisan route:cache || echo "Skipping route cache"
+    php artisan view:cache || echo "Skipping view cache"
+
+render.yaml:
+  - Added CACHE_STORE=file
+  - Added FILESYSTEM_DISK=local
+
+DEPLOYMENT STATUS:
+------------------
+✅ Committed: e6f5370
+✅ Pushed to: https://github.com/jade641/CITS_backend
+✅ Ready for Render redeploy
+
+NEXT STEPS:
+-----------
+1. Render will auto-detect the new commit
+2. Click "Manual Deploy" or wait for auto-deploy
+3. Docker build should complete successfully now
+4. Application will start on PORT from Render
+
+IMPORTANT NOTES:
+----------------
+- Database is NOT required during Docker BUILD phase
+- Database connection only needed at RUNTIME
+- Session/cache now use file-based storage (production-safe)
+- Queue uses sync driver (no background workers needed)
+
+If you need database:
+- Add database in Render Dashboard
+- Add DB_* environment variables
+- Run migrations: php artisan migrate --force
+
+================================================================================

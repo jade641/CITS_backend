@@ -7,9 +7,10 @@ return [
         env('FRONTEND_URL'),
         'http://localhost:5173',
         'http://127.0.0.1:5173',
+        'https://cits-frontend-mu.vercel.app',
     ], fn($value) => !empty($value)),
     'allowed_origins_patterns' => [
-        // Allow all Render, Vercel, and Netlify deployments during development
+        // Allow all Render, Vercel, and Netlify deployments
         '#^https://.*\.onrender\.com$#',
         '#^https://.*\.vercel\.app$#',
         '#^https://.*\.netlify\.app$#',

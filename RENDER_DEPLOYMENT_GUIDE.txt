@@ -112,3 +112,108 @@ POST-DEPLOYMENT:
 [ ] Migrations run successfully
 
 ================================================================================
+
+
+================================================================================
+🔐 LOGIN FIX - CRITICAL UPDATES (July 7, 2026)
+================================================================================
+
+PROBLEM: Users cannot login due to CORS and Sanctum configuration issues
+
+SOLUTION: Update Render Environment Variables
+
+STEP 1: GO TO RENDER DASHBOARD
+-------------------------------
+1. Navigate to: https://dashboard.render.com/
+2. Select your backend service: cits-backend-s12z
+
+STEP 2: UPDATE ENVIRONMENT VARIABLES
+-------------------------------------
+Go to Environment tab and ADD/UPDATE these variables:
+
+Required Variables:
+-------------------
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://cits-backend-s12z.onrender.com
+FRONTEND_URL=https://cits-frontend-mu.vercel.app
+
+SESSION_DRIVER=cookie
+SESSION_DOMAIN=.onrender.com
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=none
+
+SANCTUM_STATEFUL_DOMAINS=cits-frontend-mu.vercel.app,*.vercel.app
+
+DB_CONNECTION=mysql
+DB_HOST=db58836.public.databaseasp.net
+DB_PORT=3306
+DB_DATABASE=db58836
+DB_USERNAME=db58836
+DB_PASSWORD=L?e7-3Tjq#6G
+
+STEP 3: REDEPLOY
+----------------
+1. Click "Manual Deploy" > "Deploy latest commit"
+2. Wait for deployment to complete (5-10 minutes)
+
+STEP 4: TEST LOGIN CREDENTIALS
+-------------------------------
+After redeployment, test these accounts:
+
+Admin Account:
+  Email: admin@cyber.com
+  Password: password
+
+Analyst Account:
+  Email: analyst@cyberincidentsystem.com
+  Password: password
+
+User Account:
+  Email: user@cyberincident.com
+  Password: password
+
+STEP 5: VERIFY CORS IS WORKING
+-------------------------------
+Open browser console at https://cits-frontend-mu.vercel.app/
+You should NOT see CORS errors anymore.
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+IF LOGIN STILL FAILS:
+----------------------
+1. Clear browser cookies and cache
+2. Check Render logs for errors:
+   https://dashboard.render.com/web/[your-service]/logs
+
+3. Verify CORS headers in browser Network tab:
+   - Access-Control-Allow-Origin should be: https://cits-frontend-mu.vercel.app
+   - Access-Control-Allow-Credentials should be: true
+
+4. Test CSRF cookie endpoint:
+   curl -I https://cits-backend-s12z.onrender.com/sanctum/csrf-cookie
+
+IF YOU SEE "Invalid credentials":
+----------------------------------
+Run this command locally to reset password:
+   cd backend
+   php artisan user:reset-password admin@cyber.com newpassword
+
+Then use the new password to login.
+
+================================================================================
+📝 IMPORTANT NOTES
+================================================================================
+
+✅ All user passwords have been reset to: password
+✅ Database is already seeded with 3 users
+✅ CORS is now configured for Vercel frontend
+✅ Sanctum stateful authentication is enabled
+✅ Session cookies are now properly configured for cross-domain
+
+🚨 SECURITY REMINDER:
+After testing, immediately change all default passwords in production!
+
+================================================================================

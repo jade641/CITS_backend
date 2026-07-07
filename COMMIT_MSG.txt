@@ -1,0 +1,7 @@
+Fix: Configure production database and session cookie defaults
+
+- Set default DB connection to mysql (replaces default sqlite)
+- Configure production MySQL credentials for MonsterASP database in database.php config defaults
+- Configure session cookie defaults in session.php to prevent public suffix errors (.onrender.com overridden to null)
+- Configure default session cookie secure to true and SameSite to none for cross-site browser support
+- Allow Vercel frontend domain explicitly in config/cors.php and config/sanctum.php
