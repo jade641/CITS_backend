@@ -57,7 +57,7 @@ class IncidentService
      */
     public function createIncident(array $data, User $actor, ?Request $request = null): Incident
     {
-        $openStatus = IncidentStatus::query()->where('slug', 'open')->firstOrFail();
+        $openStatus = IncidentStatus::query()->where('slug', 'new')->firstOrFail();
 
         $data['description'] = (string) ($data['description'] ?? '');
 
