@@ -1,9 +1,7 @@
 -- Cyber Incident Ticketing System (CITS) Database Initialization Script
 -- Target Database: MySQL
 -- Database Name: cyber_incident_db
-
-CREATE DATABASE IF NOT EXISTS `cyber_incident_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `cyber_incident_db`;
+-- Database creation skipped to support pre-provisioned hosting databases (e.g. MonsterASP)
 
 -- Disabling foreign key checks during schema setup
 SET FOREIGN_KEY_CHECKS = 0;
@@ -548,14 +546,13 @@ INSERT INTO `permission_role` (`role_id`, `permission_id`) VALUES
 (3, 1), (3, 5), (3, 6), (3, 11), (3, 12), (3, 17);
 
 -- -------------------------------------------------------------
--- SEED: users (admin, analyst, supervisor, user)
+-- SEED: users (admin, analyst, user)
 -- Passwords are set to 'password' (hashed using bcrypt)
 -- -------------------------------------------------------------
 INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `phone`, `department`, `job_title`, `status`, `role`, `created_at`, `updated_at`) VALUES
 (1, 'Admin User', 'admin@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567890', 'Security Operations Center', 'Chief Information Security Officer', 'active', 'Admin', NOW(), NOW()),
 (2, 'Analyst User', 'analyst@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567891', 'Incident Response Team', 'Senior Incident Responder', 'active', 'Analyst', NOW(), NOW()),
-(3, 'Regular User', 'user@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567892', 'Human Resources', 'HR Specialist', 'active', 'Analyst', NOW(), NOW()),
-(4, 'Supervisor User', 'supervisor@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567893', 'Security Operations Center', 'SOC Supervisor', 'active', 'Supervisor', NOW(), NOW());
+(3, 'Regular User', 'user@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567892', 'Human Resources', 'HR Specialist', 'active', 'Analyst', NOW(), NOW());
 
 -- -------------------------------------------------------------
 -- SEED: role_user (Assign role to users)
@@ -563,7 +560,6 @@ INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `ph
 INSERT INTO `role_user` (`role_id`, `user_id`, `assigned_by`, `created_at`, `updated_at`) VALUES
 (1, 1, NULL, NOW(), NOW()), -- Admin User has Administrator role
 (2, 2, NULL, NOW(), NOW()), -- Analyst User has Security Analyst role
-(2, 4, NULL, NOW(), NOW()), -- Supervisor User has Security Analyst role
 (3, 3, NULL, NOW(), NOW()); -- Regular User has User role
 
 -- -------------------------------------------------------------
@@ -588,5 +584,4 @@ INSERT INTO `incident_statuses` (`id`, `name`, `slug`, `description`, `sort_orde
 (3, 'Contained', 'contained', 'Incident has been contained.', 3, 0, NOW(), NOW()),
 (4, 'Eradicated', 'eradicated', 'Threat has been eradicated.', 4, 0, NOW(), NOW()),
 (5, 'Recovering', 'recovering', 'Systems are recovering.', 5, 0, NOW(), NOW()),
-(6, 'Pending Review', 'pending_review', 'Awaiting supervisor approval.', 6, 0, NOW(), NOW()),
-(7, 'Closed', 'closed', 'Incident fully closed.', 7, 1, NOW(), NOW());
+(6, 'Closed', 'closed', 'Incident fully closed.', 6, 1, NOW(), NOW());

@@ -144,11 +144,11 @@ class User extends Authenticatable
 
     public function isSocAnalyst(): bool
     {
-        return in_array($this->role, ['Analyst', 'Supervisor', 'Admin']);
+        return in_array($this->role, ['Analyst', 'Admin']);
     }
 
     public function isSocSupervisor(): bool
     {
-        return in_array($this->role, ['Supervisor', 'Admin']);
+        return $this->role === 'Admin';
     }
 }

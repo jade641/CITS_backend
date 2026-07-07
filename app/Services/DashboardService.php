@@ -18,7 +18,7 @@ class DashboardService
     public function build(User $user): array
     {
         $incidentQuery = $this->incidentService->visibleIncidentsQuery($user);
-        $openStatusIds = IncidentStatus::query()->whereIn('slug', ['new', 'investigating', 'contained', 'eradicated', 'recovering', 'pending_review'])->pluck('id');
+        $openStatusIds = IncidentStatus::query()->whereIn('slug', ['new', 'investigating', 'contained', 'eradicated', 'recovering'])->pluck('id');
         $resolvedStatusIds = IncidentStatus::query()->whereIn('slug', ['closed'])->pluck('id');
 
         $recentActivities = AuditLog::query()

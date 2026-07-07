@@ -46,23 +46,7 @@ class UserSeeder extends Seeder
         $analystRole = Role::query()->where('slug', AuthorizationMatrix::SECURITY_ANALYST)->firstOrFail();
         $analyst->roles()->sync([$analystRole->id]);
 
-        // 3. Create Supervisor User
-        $supervisor = User::query()->updateOrCreate(
-            ['email' => 'supervisor@cyberincidentsystem.com'],
-            [
-                'name' => 'Supervisor User',
-                'password' => Hash::make('password'),
-                'phone' => '+1234567893',
-                'department' => 'Security Operations Center',
-                'job_title' => 'SOC Supervisor',
-                'status' => 'active',
-                'role' => 'Supervisor',
-                'email_verified_at' => now(),
-            ]
-        );
-        $supervisor->roles()->sync([$analystRole->id]); // Sync to Security Analyst permissions
-
-        // 4. Create Regular User
+        // 3. Create Regular User
         $user = User::query()->updateOrCreate(
             ['email' => 'user@cyberincidentsystem.com'],
             [

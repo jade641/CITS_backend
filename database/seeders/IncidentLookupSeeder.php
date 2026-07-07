@@ -31,8 +31,7 @@ class IncidentLookupSeeder extends Seeder
             ['name' => 'Contained', 'slug' => 'contained', 'description' => 'Incident has been contained.', 'sort_order' => 3, 'is_closed' => false],
             ['name' => 'Eradicated', 'slug' => 'eradicated', 'description' => 'Threat has been eradicated.', 'sort_order' => 4, 'is_closed' => false],
             ['name' => 'Recovering', 'slug' => 'recovering', 'description' => 'Systems are recovering.', 'sort_order' => 5, 'is_closed' => false],
-            ['name' => 'Pending Review', 'slug' => 'pending_review', 'description' => 'Awaiting supervisor approval.', 'sort_order' => 6, 'is_closed' => false],
-            ['name' => 'Closed', 'slug' => 'closed', 'description' => 'Incident fully closed.', 'sort_order' => 7, 'is_closed' => true],
+            ['name' => 'Closed', 'slug' => 'closed', 'description' => 'Incident fully closed.', 'sort_order' => 6, 'is_closed' => true],
         ];
 
         foreach ($statuses as $status) {

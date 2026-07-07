@@ -33,7 +33,7 @@ class AnalyticsService
         return [
             'overview' => [
                 'totalIncidents' => $totalIncidents,
-                'openIncidents' => $incidents->filter(fn (Incident $incident) => in_array($incident->status?->slug, ['new', 'investigating', 'contained', 'eradicated', 'recovering', 'pending_review'], true))->count(),
+                'openIncidents' => $incidents->filter(fn (Incident $incident) => in_array($incident->status?->slug, ['new', 'investigating', 'contained', 'eradicated', 'recovering'], true))->count(),
                 'resolvedIncidents' => $resolvedIncidents->count(),
                 'criticalIncidents' => $incidents->where('severity', 'critical')->count(),
                 'resolutionRate' => $totalIncidents === 0 ? 0.0 : round(($resolvedIncidents->count() / $totalIncidents) * 100, 2),

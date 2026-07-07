@@ -323,32 +323,7 @@ class IncidentController extends Controller
         $incident = $this->incidentService->submitResolution($incident, $request->user(), $request);
 
         return response()->json([
-            'message' => 'Resolution submitted for review.',
-            'incident' => $incident,
-        ]);
-    }
-
-    public function reviewIncident(Request $request, Incident $incident): JsonResponse
-    {
-        if (! $request->user()->isSocSupervisor()) {
-            return response()->json(['message' => 'Unauthorized. Only SOC Supervisors or Administrators can review submissions.'], 403);
-        }
-
-        $request->validate([
-            'action' => ['required', 'string', 'in:approve,reject'],
-            'rejection_reason' => ['required_if:action,reject', 'nullable', 'string'],
-        ]);
-
-        $incident = $this->incidentService->reviewIncident(
-            $incident,
-            $request->input('action'),
-            $request->input('rejection_reason'),
-            $request->user(),
-            $request
-        );
-
-        return response()->json([
-            'message' => $request->input('action') === 'approve' ? 'Resolution approved.' : 'Resolution rejected.',
+            'message' => 'Incident resolved and closed successfully.',
             'incident' => $incident,
         ]);
     }

@@ -201,7 +201,7 @@ class IncidentService
 
     public function changeStatus(Incident $incident, IncidentStatus $status, User $actor, ?string $resolutionNotes = null, ?Request $request = null): Incident
     {
-        $lifecycle = ['new', 'investigating', 'contained', 'eradicated', 'recovering', 'pending_review', 'closed'];
+        $lifecycle = ['new', 'investigating', 'contained', 'eradicated', 'recovering', 'closed'];
         $currentSlug = $incident->status?->slug ?? 'new';
         $newSlug = $status->slug;
 
@@ -214,9 +214,6 @@ class IncidentService
             }
             if ($newIndex !== $currentIndex + 1) {
                 throw new \InvalidArgumentException("Analyst can only transition to the immediate next stage in the lifecycle. No skipping or going backward.");
-            }
-            if (in_array($newSlug, ['pending_review', 'closed'])) {
-                throw new \InvalidArgumentException("Analysts cannot transition to Pending Review or Closed directly. Please submit resolution or seek supervisor approval.");
             }
         }
 
@@ -616,10 +613,12 @@ class IncidentService
     public function submitResolution(Incident $incident, User $actor, ?Request $request = null): Incident
     {
         return DB::transaction(function () use ($incident, $actor, $request): Incident {
-            $pendingStatus = IncidentStatus::query()->where('slug', 'pending_review')->firstOrFail();
+            $closedStatus = IncidentStatus::query()->where('slug', 'closed')->firstOrFail();
 
             $incident->forceFill([
-                'status_id' => $pendingStatus->id,
+                'status_id' => $closedStatus->id,
+                'closed_at' => now(),
+                'resolved_at' => now(),
                 'updated_by' => $actor->id,
             ])->save();
 
@@ -627,108 +626,28 @@ class IncidentService
                 $incident,
                 $actor,
                 'status_changed',
-                sprintf('Submitted resolution. Changed incident %s status to Pending Review.', $incident->ticket_number),
+                sprintf('Resolved & Closed incident. Changed incident %s status to Closed.', $incident->ticket_number),
                 'status_id',
                 $incident->status_id,
-                $pendingStatus->id,
+                $closedStatus->id,
             );
 
             $this->auditLogService->log(
                 $actor,
-                'incident.resolution_submitted',
+                'incident.resolved',
                 $incident,
                 [],
                 $request
             );
 
-            // Notify supervisors
-            $supervisors = User::query()->where('role', 'Supervisor')->orWhere('role', 'Admin')->get();
+            // Notify reporter and assignee
             $this->notificationService->notifyUsers(
-                $supervisors,
-                'Incident Resolution Awaiting Review',
-                sprintf('Incident %s resolution has been submitted and is awaiting review.', $incident->ticket_number),
-                'warning',
+                array_filter([$incident->reporter, $incident->currentAssignee]),
+                'Incident Resolved & Closed',
+                sprintf('Incident %s has been successfully resolved and closed.', $incident->ticket_number),
+                'success',
                 ['incident_id' => $incident->id],
             );
-
-            return $this->loadIncident($incident);
-        });
-    }
-
-    public function reviewIncident(Incident $incident, string $action, ?string $rejectionReason, User $actor, ?Request $request = null): Incident
-    {
-        return DB::transaction(function () use ($incident, $action, $rejectionReason, $actor, $request): Incident {
-            if ($action === 'approve') {
-                $closedStatus = IncidentStatus::query()->where('slug', 'closed')->firstOrFail();
-
-                $incident->forceFill([
-                    'status_id' => $closedStatus->id,
-                    'closed_at' => now(),
-                    'resolved_at' => now(),
-                    'rejection_reason' => null,
-                    'updated_by' => $actor->id,
-                ])->save();
-
-                $this->recordHistory(
-                    $incident,
-                    $actor,
-                    'status_changed',
-                    sprintf('Approved resolution. Changed incident %s status to Closed.', $incident->ticket_number),
-                    'status_id',
-                    $incident->status_id,
-                    $closedStatus->id,
-                );
-
-                $this->auditLogService->log(
-                    $actor,
-                    'incident.reviewed',
-                    $incident,
-                    ['action' => 'approve'],
-                    $request
-                );
-
-                $this->notificationService->notifyUsers(
-                    array_filter([$incident->reporter, $incident->currentAssignee]),
-                    'Incident Resolution Approved',
-                    sprintf('Incident %s resolution has been approved and the incident is closed.', $incident->ticket_number),
-                    'success',
-                    ['incident_id' => $incident->id],
-                );
-            } else {
-                $investigatingStatus = IncidentStatus::query()->where('slug', 'investigating')->firstOrFail();
-
-                $incident->forceFill([
-                    'status_id' => $investigatingStatus->id,
-                    'rejection_reason' => $rejectionReason,
-                    'updated_by' => $actor->id,
-                ])->save();
-
-                $this->recordHistory(
-                    $incident,
-                    $actor,
-                    'status_changed',
-                    sprintf('Rejected resolution. Reverted incident %s status to Investigating.', $incident->ticket_number),
-                    'status_id',
-                    $incident->status_id,
-                    $investigatingStatus->id,
-                );
-
-                $this->auditLogService->log(
-                    $actor,
-                    'incident.reviewed',
-                    $incident,
-                    ['action' => 'reject', 'reason' => $rejectionReason],
-                    $request
-                );
-
-                $this->notificationService->notifyUsers(
-                    array_filter([$incident->reporter, $incident->currentAssignee]),
-                    'Incident Resolution Rejected',
-                    sprintf('Incident %s resolution was rejected: %s', $incident->ticket_number, $rejectionReason),
-                    'error',
-                    ['incident_id' => $incident->id],
-                );
-            }
 
             return $this->loadIncident($incident);
         });

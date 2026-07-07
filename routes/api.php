@@ -76,7 +76,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/incidents/{incident}/findings', [IncidentController::class, 'saveFindings']);
     Route::post('/incidents/{incident}/remediation-actions', [IncidentController::class, 'saveRemediationActions']);
     Route::post('/incidents/{incident}/submit-resolution', [IncidentController::class, 'submitResolution']);
-    Route::post('/incidents/{incident}/review', [IncidentController::class, 'reviewIncident']);
     Route::get('/incidents/{incident}/audit-log', [IncidentController::class, 'getAuditLog']);
 
     Route::post('/incidents/{incident}/assignments', [IncidentAssignmentController::class, 'store']);
