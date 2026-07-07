@@ -18,12 +18,21 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s,%s,%s',
-        'localhost,localhost:3000,localhost:5173,127.0.0.1,127.0.0.1:8000,127.0.0.1:5173,::1',
-        'cits-frontend-mu.vercel.app',
-        Sanctum::currentApplicationUrlWithPort()
-    ))),
+    'stateful' => array_merge(
+        [
+            'localhost',
+            'localhost:3000',
+            'localhost:5173',
+            '127.0.0.1',
+            '127.0.0.1:8000',
+            '127.0.0.1:5173',
+            '::1',
+            'cits-frontend-mu.vercel.app',
+            '*.vercel.app',
+            Sanctum::currentApplicationUrlWithPort(),
+        ],
+        array_filter(explode(',', env('SANCTUM_STATEFUL_DOMAINS', '')))
+    ),
 
     /*
     |--------------------------------------------------------------------------
