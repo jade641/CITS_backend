@@ -23,7 +23,7 @@ class AnalyticsService
             ->get();
 
         $resolved = $incidents->filter(fn (Incident $incident) => $this->completionTimestamp($incident) && $incident->reported_at);
-        $resolvedIncidents = $incidents->filter(fn (Incident $incident) => in_array($incident->status?->slug, ['resolved', 'closed'], true));
+        $resolvedIncidents = $incidents->filter(fn (Incident $incident) => in_array($incident->status?->slug, ['closed'], true));
         $meanResolutionHours = $resolved->isEmpty()
             ? 0.0
             : round($resolved->avg(fn (Incident $incident) => $incident->reported_at->diffInHours($incident->resolved_at)), 2);
@@ -33,7 +33,7 @@ class AnalyticsService
         return [
             'overview' => [
                 'totalIncidents' => $totalIncidents,
-                'openIncidents' => $incidents->filter(fn (Incident $incident) => in_array($incident->status?->slug, ['open', 'assigned', 'in_progress', 'pending'], true))->count(),
+                'openIncidents' => $incidents->filter(fn (Incident $incident) => in_array($incident->status?->slug, ['new', 'investigating', 'contained', 'eradicated', 'recovering', 'pending_review'], true))->count(),
                 'resolvedIncidents' => $resolvedIncidents->count(),
                 'criticalIncidents' => $incidents->where('severity', 'critical')->count(),
                 'resolutionRate' => $totalIncidents === 0 ? 0.0 : round(($resolvedIncidents->count() / $totalIncidents) * 100, 2),

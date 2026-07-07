@@ -8,6 +8,11 @@ use App\Models\IncidentAttachment;
 use App\Models\IncidentComment;
 use App\Models\IncidentHistory;
 use App\Models\IncidentStatus;
+use App\Models\IncidentTimeline;
+use App\Models\IncidentIoc;
+use App\Models\IncidentAffectedSystem;
+use App\Models\IncidentActionTaken;
+use App\Models\IncidentRemediationAction;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -196,6 +201,25 @@ class IncidentService
 
     public function changeStatus(Incident $incident, IncidentStatus $status, User $actor, ?string $resolutionNotes = null, ?Request $request = null): Incident
     {
+        $lifecycle = ['new', 'investigating', 'contained', 'eradicated', 'recovering', 'pending_review', 'closed'];
+        $currentSlug = $incident->status?->slug ?? 'new';
+        $newSlug = $status->slug;
+
+        $currentIndex = array_search($currentSlug, $lifecycle);
+        $newIndex = array_search($newSlug, $lifecycle);
+
+        if (!$actor->isSocSupervisor()) {
+            if ($currentIndex === false || $newIndex === false) {
+                throw new \InvalidArgumentException("Invalid status transition.");
+            }
+            if ($newIndex !== $currentIndex + 1) {
+                throw new \InvalidArgumentException("Analyst can only transition to the immediate next stage in the lifecycle. No skipping or going backward.");
+            }
+            if (in_array($newSlug, ['pending_review', 'closed'])) {
+                throw new \InvalidArgumentException("Analysts cannot transition to Pending Review or Closed directly. Please submit resolution or seek supervisor approval.");
+            }
+        }
+
         DB::transaction(function () use ($incident, $status, $actor, $resolutionNotes, $request): void {
             $oldStatusId = $incident->status_id;
 
@@ -208,17 +232,9 @@ class IncidentService
                 $payload['resolution_notes'] = $resolutionNotes;
             }
 
-            if ($status->slug === 'resolved') {
-                $payload['resolved_at'] = now();
-            }
-
             if ($status->slug === 'closed') {
                 $payload['closed_at'] = now();
-            }
-
-            // When an analyst marks a ticket as 'failed', record a failed_jobs entry
-            if ($status->slug === 'failed') {
-                $payload['closed_at'] = now();
+                $payload['resolved_at'] = now();
             }
 
             $incident->forceFill($payload)->save();
@@ -248,36 +264,6 @@ class IncidentService
                 'success',
                 ['incident_id' => $incident->id, 'status' => $status->slug],
             );
-
-            // If status is failed, insert a record into failed_jobs for auditing/tracking.
-            if ($status->slug === 'failed') {
-                try {
-                    DB::table('failed_jobs')->insert([
-                        'uuid' => (string) Str::uuid(),
-                        'connection' => config('queue.default') ?? 'sync',
-                        'queue' => 'incidents',
-                        'payload' => json_encode([
-                            'incident_id' => $incident->id,
-                            'ticket_number' => $incident->ticket_number,
-                            'marked_by' => $actor->id,
-                            'marked_by_name' => $actor->name,
-                            'notes' => $resolutionNotes,
-                            'timestamp' => now()->toDateTimeString(),
-                        ]),
-                        'exception' => json_encode(['message' => 'Marked failed by '.$actor->name, 'notes' => $resolutionNotes]),
-                        'failed_at' => now(),
-                    ]);
-                } catch (\Throwable $e) {
-                    // Do not abort the status change if failed_jobs insert fails; log to audit instead.
-                    $this->auditLogService->log(
-                        $actor,
-                        'incident.failed_job_record_error',
-                        $incident,
-                        ['error' => $e->getMessage()],
-                        $request,
-                    );
-                }
-            }
         });
 
         return $this->loadIncident($incident->refresh());
@@ -365,7 +351,387 @@ class IncidentService
             'comments.user.roles',
             'attachments.user.roles',
             'history.user.roles',
+            'timelines',
+            'iocs',
+            'affectedSystems',
+            'actionsTaken',
+            'remediationActions.owner.roles',
         ]);
+    }
+
+    public function saveTimeline(Incident $incident, array $entries, User $actor, ?Request $request = null): Incident
+    {
+        DB::transaction(function () use ($incident, $entries, $actor, $request): void {
+            $incident->timelines()->delete();
+            foreach ($entries as $entry) {
+                $incident->timelines()->create([
+                    'occurred_at' => $entry['occurred_at'],
+                    'description' => $entry['description'],
+                ]);
+            }
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.timeline_updated',
+                $incident,
+                ['count' => count($entries)],
+                $request
+            );
+        });
+
+        return $this->loadIncident($incident->refresh());
+    }
+
+    public function saveIocs(Incident $incident, array $entries, User $actor, ?Request $request = null): Incident
+    {
+        DB::transaction(function () use ($incident, $entries, $actor, $request): void {
+            $incident->iocs()->delete();
+            foreach ($entries as $entry) {
+                $incident->iocs()->create([
+                    'type' => $entry['type'],
+                    'value' => $entry['value'],
+                    'description' => $entry['description'] ?? null,
+                ]);
+            }
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.iocs_updated',
+                $incident,
+                ['count' => count($entries)],
+                $request
+            );
+        });
+
+        return $this->loadIncident($incident->refresh());
+    }
+
+    public function saveAffectedSystems(Incident $incident, array $entries, User $actor, ?Request $request = null): Incident
+    {
+        DB::transaction(function () use ($incident, $entries, $actor, $request): void {
+            $incident->affectedSystems()->delete();
+            foreach ($entries as $entry) {
+                $incident->affectedSystems()->create([
+                    'asset_name' => $entry['asset_name'],
+                    'asset_type' => $entry['asset_type'],
+                    'impact_level' => $entry['impact_level'],
+                ]);
+            }
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.affected_systems_updated',
+                $incident,
+                ['count' => count($entries)],
+                $request
+            );
+        });
+
+        return $this->loadIncident($incident->refresh());
+    }
+
+    public function saveActionsTaken(Incident $incident, array $entries, User $actor, ?Request $request = null): Incident
+    {
+        DB::transaction(function () use ($incident, $entries, $actor, $request): void {
+            $incident->actionsTaken()->delete();
+            foreach ($entries as $entry) {
+                $incident->actionsTaken()->create([
+                    'occurred_at' => $entry['occurred_at'],
+                    'action' => $entry['action'],
+                    'performed_by' => $entry['performed_by'],
+                ]);
+            }
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.actions_taken_updated',
+                $incident,
+                ['count' => count($entries)],
+                $request
+            );
+        });
+
+        return $this->loadIncident($incident->refresh());
+    }
+
+    public function saveSeverity(Incident $incident, array $data, User $actor, ?Request $request = null): Incident
+    {
+        DB::transaction(function () use ($incident, $data, $actor, $request): void {
+            $conf = $data['confidentiality_impact'];
+            $int = $data['integrity_impact'];
+            $avail = $data['availability_impact'];
+            $systems = (int)$data['affected_systems_count'];
+            $sensitivity = $data['data_sensitivity'];
+            $override = (bool)$data['severity_override'];
+
+            $calculatedSeverity = $this->calculateSeverity($conf, $int, $avail, $systems, $sensitivity);
+            
+            $finalSeverity = $override ? $data['severity'] : $calculatedSeverity;
+
+            $incident->forceFill([
+                'confidentiality_impact' => $conf,
+                'integrity_impact' => $int,
+                'availability_impact' => $avail,
+                'affected_systems_count' => $systems,
+                'data_sensitivity' => $sensitivity,
+                'severity_override' => $override,
+                'severity_override_justification' => $override ? ($data['severity_override_justification'] ?? null) : null,
+                'severity' => $finalSeverity,
+                'updated_by' => $actor->id,
+            ])->save();
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.severity_updated',
+                $incident,
+                ['severity' => $finalSeverity, 'override' => $override],
+                $request
+            );
+        });
+
+        return $this->loadIncident($incident->refresh());
+    }
+
+    public function calculateSeverity(
+        string $confidentiality,
+        string $integrity,
+        string $availability,
+        int $affectedSystems,
+        string $dataSensitivity
+    ): string {
+        $impactMap = ['none' => 0, 'low' => 1, 'medium' => 2, 'high' => 3];
+        $sensitivityMap = ['public' => 1, 'internal' => 2, 'confidential' => 3, 'restricted' => 4];
+
+        $confScore = $impactMap[strtolower($confidentiality)] ?? 0;
+        $intScore = $impactMap[strtolower($integrity)] ?? 0;
+        $availScore = $impactMap[strtolower($availability)] ?? 0;
+        $sensitivityScore = $sensitivityMap[strtolower($dataSensitivity)] ?? 1;
+
+        $systemsScore = 0;
+        if ($affectedSystems > 20) {
+            $systemsScore = 3;
+        } elseif ($affectedSystems > 5) {
+            $systemsScore = 2;
+        } elseif ($affectedSystems >= 1) {
+            $systemsScore = 1;
+        }
+
+        $total = $confScore + $intScore + $availScore + $sensitivityScore + $systemsScore;
+
+        if ($total >= 13 || ($confScore === 3 && $sensitivityScore === 4)) {
+            return 'critical';
+        } elseif ($total >= 9) {
+            return 'high';
+        } elseif ($total >= 5) {
+            return 'medium';
+        } else {
+            return 'low';
+        }
+    }
+
+    public function uploadEvidence(Incident $incident, UploadedFile $file, string $description, User $actor, ?Request $request = null): IncidentAttachment
+    {
+        return DB::transaction(function () use ($incident, $file, $description, $actor, $request): IncidentAttachment {
+            $storedPath = $file->storePublicly('incident-evidence/'.$incident->id, 'public');
+            $fileHash = hash_file('sha256', $file->getRealPath());
+
+            $attachment = $incident->attachments()->create([
+                'user_id' => $actor->id,
+                'original_name' => $file->getClientOriginalName(),
+                'stored_name' => basename($storedPath),
+                'disk' => 'public',
+                'file_path' => $storedPath,
+                'mime_type' => $file->getClientMimeType() ?? 'application/octet-stream',
+                'file_hash' => $fileHash,
+                'description' => $description,
+                'size_bytes' => $file->getSize(),
+            ]);
+
+            $this->recordHistory(
+                $incident,
+                $actor,
+                'attachment_added',
+                sprintf('Uploaded evidence %s to incident %s.', $file->getClientOriginalName(), $incident->ticket_number),
+            );
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.attachment_added',
+                $incident,
+                ['attachment_id' => $attachment->id, 'file_name' => $attachment->original_name, 'hash' => $fileHash],
+                $request,
+            );
+
+            return $attachment;
+        });
+    }
+
+    public function saveFindings(Incident $incident, array $data, User $actor, ?Request $request = null): Incident
+    {
+        DB::transaction(function () use ($incident, $data, $actor, $request): void {
+            $incident->forceFill([
+                'root_cause_category' => $data['root_cause_category'],
+                'root_cause_explanation' => $data['root_cause_explanation'],
+                'lessons_learned' => $data['lessons_learned'],
+                'updated_by' => $actor->id,
+            ])->save();
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.findings_updated',
+                $incident,
+                [],
+                $request
+            );
+        });
+
+        return $this->loadIncident($incident->refresh());
+    }
+
+    public function saveRemediationActions(Incident $incident, array $entries, User $actor, ?Request $request = null): Incident
+    {
+        DB::transaction(function () use ($incident, $entries, $actor, $request): void {
+            $incident->remediationActions()->delete();
+            foreach ($entries as $entry) {
+                $incident->remediationActions()->create([
+                    'description' => $entry['description'],
+                    'owner_id' => $entry['owner_id'],
+                    'due_date' => $entry['due_date'],
+                    'status' => $entry['status'],
+                ]);
+            }
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.remediation_actions_updated',
+                $incident,
+                ['count' => count($entries)],
+                $request
+            );
+        });
+
+        return $this->loadIncident($incident->refresh());
+    }
+
+    public function submitResolution(Incident $incident, User $actor, ?Request $request = null): Incident
+    {
+        return DB::transaction(function () use ($incident, $actor, $request): Incident {
+            $pendingStatus = IncidentStatus::query()->where('slug', 'pending_review')->firstOrFail();
+
+            $incident->forceFill([
+                'status_id' => $pendingStatus->id,
+                'updated_by' => $actor->id,
+            ])->save();
+
+            $this->recordHistory(
+                $incident,
+                $actor,
+                'status_changed',
+                sprintf('Submitted resolution. Changed incident %s status to Pending Review.', $incident->ticket_number),
+                'status_id',
+                $incident->status_id,
+                $pendingStatus->id,
+            );
+
+            $this->auditLogService->log(
+                $actor,
+                'incident.resolution_submitted',
+                $incident,
+                [],
+                $request
+            );
+
+            // Notify supervisors
+            $supervisors = User::query()->where('role', 'Supervisor')->orWhere('role', 'Admin')->get();
+            $this->notificationService->notifyUsers(
+                $supervisors,
+                'Incident Resolution Awaiting Review',
+                sprintf('Incident %s resolution has been submitted and is awaiting review.', $incident->ticket_number),
+                'warning',
+                ['incident_id' => $incident->id],
+            );
+
+            return $this->loadIncident($incident);
+        });
+    }
+
+    public function reviewIncident(Incident $incident, string $action, ?string $rejectionReason, User $actor, ?Request $request = null): Incident
+    {
+        return DB::transaction(function () use ($incident, $action, $rejectionReason, $actor, $request): Incident {
+            if ($action === 'approve') {
+                $closedStatus = IncidentStatus::query()->where('slug', 'closed')->firstOrFail();
+
+                $incident->forceFill([
+                    'status_id' => $closedStatus->id,
+                    'closed_at' => now(),
+                    'resolved_at' => now(),
+                    'rejection_reason' => null,
+                    'updated_by' => $actor->id,
+                ])->save();
+
+                $this->recordHistory(
+                    $incident,
+                    $actor,
+                    'status_changed',
+                    sprintf('Approved resolution. Changed incident %s status to Closed.', $incident->ticket_number),
+                    'status_id',
+                    $incident->status_id,
+                    $closedStatus->id,
+                );
+
+                $this->auditLogService->log(
+                    $actor,
+                    'incident.reviewed',
+                    $incident,
+                    ['action' => 'approve'],
+                    $request
+                );
+
+                $this->notificationService->notifyUsers(
+                    array_filter([$incident->reporter, $incident->currentAssignee]),
+                    'Incident Resolution Approved',
+                    sprintf('Incident %s resolution has been approved and the incident is closed.', $incident->ticket_number),
+                    'success',
+                    ['incident_id' => $incident->id],
+                );
+            } else {
+                $investigatingStatus = IncidentStatus::query()->where('slug', 'investigating')->firstOrFail();
+
+                $incident->forceFill([
+                    'status_id' => $investigatingStatus->id,
+                    'rejection_reason' => $rejectionReason,
+                    'updated_by' => $actor->id,
+                ])->save();
+
+                $this->recordHistory(
+                    $incident,
+                    $actor,
+                    'status_changed',
+                    sprintf('Rejected resolution. Reverted incident %s status to Investigating.', $incident->ticket_number),
+                    'status_id',
+                    $incident->status_id,
+                    $investigatingStatus->id,
+                );
+
+                $this->auditLogService->log(
+                    $actor,
+                    'incident.reviewed',
+                    $incident,
+                    ['action' => 'reject', 'reason' => $rejectionReason],
+                    $request
+                );
+
+                $this->notificationService->notifyUsers(
+                    array_filter([$incident->reporter, $incident->currentAssignee]),
+                    'Incident Resolution Rejected',
+                    sprintf('Incident %s resolution was rejected: %s', $incident->ticket_number, $rejectionReason),
+                    'error',
+                    ['incident_id' => $incident->id],
+                );
+            }
+
+            return $this->loadIncident($incident);
+        });
     }
 
     private function generateTicketNumber(): string

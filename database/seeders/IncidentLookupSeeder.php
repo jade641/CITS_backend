@@ -25,15 +25,14 @@ class IncidentLookupSeeder extends Seeder
             IncidentCategory::query()->updateOrCreate(['slug' => $category['slug']], $category);
         }
 
-        IncidentStatus::query()->where('slug', 'in-progress')->update(['slug' => 'in_progress']);
-
         $statuses = [
-            ['name' => 'Open', 'slug' => 'open', 'description' => 'Newly reported incident awaiting triage.', 'sort_order' => 1, 'is_closed' => false],
-            ['name' => 'Assigned', 'slug' => 'assigned', 'description' => 'Incident has been assigned to an analyst.', 'sort_order' => 2, 'is_closed' => false],
-            ['name' => 'In Progress', 'slug' => 'in_progress', 'description' => 'Investigation or response is underway.', 'sort_order' => 3, 'is_closed' => false],
-            ['name' => 'Resolved', 'slug' => 'resolved', 'description' => 'Corrective action completed and awaiting closure.', 'sort_order' => 4, 'is_closed' => false],
-            ['name' => 'Failed', 'slug' => 'failed', 'description' => 'Analyst marked the investigation as failed.', 'sort_order' => 5, 'is_closed' => true],
-            ['name' => 'Closed', 'slug' => 'closed', 'description' => 'Incident fully closed.', 'sort_order' => 6, 'is_closed' => true],
+            ['name' => 'New', 'slug' => 'new', 'description' => 'Newly reported incident awaiting triage.', 'sort_order' => 1, 'is_closed' => false],
+            ['name' => 'Investigating', 'slug' => 'investigating', 'description' => 'Investigation or response is underway.', 'sort_order' => 2, 'is_closed' => false],
+            ['name' => 'Contained', 'slug' => 'contained', 'description' => 'Incident has been contained.', 'sort_order' => 3, 'is_closed' => false],
+            ['name' => 'Eradicated', 'slug' => 'eradicated', 'description' => 'Threat has been eradicated.', 'sort_order' => 4, 'is_closed' => false],
+            ['name' => 'Recovering', 'slug' => 'recovering', 'description' => 'Systems are recovering.', 'sort_order' => 5, 'is_closed' => false],
+            ['name' => 'Pending Review', 'slug' => 'pending_review', 'description' => 'Awaiting supervisor approval.', 'sort_order' => 6, 'is_closed' => false],
+            ['name' => 'Closed', 'slug' => 'closed', 'description' => 'Incident fully closed.', 'sort_order' => 7, 'is_closed' => true],
         ];
 
         foreach ($statuses as $status) {

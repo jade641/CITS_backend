@@ -22,6 +22,7 @@ CREATE TABLE `users` (
   `department` VARCHAR(255) DEFAULT NULL,
   `job_title` VARCHAR(255) DEFAULT NULL,
   `status` VARCHAR(255) NOT NULL DEFAULT 'active',
+  `role` VARCHAR(255) NOT NULL DEFAULT 'Analyst',
   `last_login_at` TIMESTAMP NULL DEFAULT NULL,
   `last_login_ip` VARCHAR(45) DEFAULT NULL,
   `remember_token` VARCHAR(100) DEFAULT NULL,
@@ -251,10 +252,21 @@ CREATE TABLE `incidents` (
   `reporter_id` BIGINT UNSIGNED NOT NULL,
   `current_assignee_id` BIGINT UNSIGNED DEFAULT NULL,
   `affected_asset` VARCHAR(255) DEFAULT NULL,
+  `confidentiality_impact` VARCHAR(20) DEFAULT NULL,
+  `integrity_impact` VARCHAR(20) DEFAULT NULL,
+  `availability_impact` VARCHAR(20) DEFAULT NULL,
+  `affected_systems_count` INT NOT NULL DEFAULT 0,
+  `data_sensitivity` VARCHAR(50) DEFAULT NULL,
+  `severity_override` TINYINT(1) NOT NULL DEFAULT 0,
+  `severity_override_justification` TEXT DEFAULT NULL,
   `source_ip` VARCHAR(45) DEFAULT NULL,
   `location` VARCHAR(255) DEFAULT NULL,
   `impact_summary` TEXT DEFAULT NULL,
   `resolution_notes` TEXT DEFAULT NULL,
+  `root_cause_category` VARCHAR(50) DEFAULT NULL,
+  `root_cause_explanation` TEXT DEFAULT NULL,
+  `lessons_learned` TEXT DEFAULT NULL,
+  `rejection_reason` TEXT DEFAULT NULL,
   `occurred_at` TIMESTAMP NOT NULL,
   `reported_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `resolved_at` TIMESTAMP NULL DEFAULT NULL,
@@ -323,6 +335,8 @@ CREATE TABLE `incident_attachments` (
   `disk` VARCHAR(255) NOT NULL DEFAULT 'public',
   `file_path` VARCHAR(255) NOT NULL,
   `mime_type` VARCHAR(255) NOT NULL,
+  `file_hash` VARCHAR(64) DEFAULT NULL,
+  `description` TEXT DEFAULT NULL,
   `size_bytes` BIGINT UNSIGNED NOT NULL,
   `created_at` TIMESTAMP NULL DEFAULT NULL,
   `updated_at` TIMESTAMP NULL DEFAULT NULL,
@@ -347,6 +361,82 @@ CREATE TABLE `incident_history` (
   `updated_at` TIMESTAMP NULL DEFAULT NULL,
   CONSTRAINT `incident_history_incident_id_foreign` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE,
   CONSTRAINT `incident_history_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -------------------------------------------------------------
+-- TABLE: incident_timelines
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `incident_timelines`;
+CREATE TABLE `incident_timelines` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `incident_id` BIGINT UNSIGNED NOT NULL,
+  `occurred_at` TIMESTAMP NOT NULL,
+  `description` TEXT NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  CONSTRAINT `incident_timelines_incident_id_foreign` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -------------------------------------------------------------
+-- TABLE: incident_iocs
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `incident_iocs`;
+CREATE TABLE `incident_iocs` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `incident_id` BIGINT UNSIGNED NOT NULL,
+  `type` VARCHAR(255) NOT NULL,
+  `value` VARCHAR(255) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  CONSTRAINT `incident_iocs_incident_id_foreign` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -------------------------------------------------------------
+-- TABLE: incident_affected_systems
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `incident_affected_systems`;
+CREATE TABLE `incident_affected_systems` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `incident_id` BIGINT UNSIGNED NOT NULL,
+  `asset_name` VARCHAR(255) NOT NULL,
+  `asset_type` VARCHAR(255) NOT NULL,
+  `impact_level` VARCHAR(255) NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  CONSTRAINT `incident_affected_systems_incident_id_foreign` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -------------------------------------------------------------
+-- TABLE: incident_actions_taken
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `incident_actions_taken`;
+CREATE TABLE `incident_actions_taken` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `incident_id` BIGINT UNSIGNED NOT NULL,
+  `occurred_at` TIMESTAMP NOT NULL,
+  `action` TEXT NOT NULL,
+  `performed_by` VARCHAR(255) NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  CONSTRAINT `incident_actions_taken_incident_id_foreign` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -------------------------------------------------------------
+-- TABLE: incident_remediation_actions
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `incident_remediation_actions`;
+CREATE TABLE `incident_remediation_actions` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `incident_id` BIGINT UNSIGNED NOT NULL,
+  `description` TEXT NOT NULL,
+  `owner_id` BIGINT UNSIGNED NOT NULL,
+  `due_date` DATE NOT NULL,
+  `status` VARCHAR(255) NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  CONSTRAINT `incident_remediation_actions_incident_id_foreign` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `incident_remediation_actions_owner_id_foreign` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -------------------------------------------------------------
@@ -458,13 +548,14 @@ INSERT INTO `permission_role` (`role_id`, `permission_id`) VALUES
 (3, 1), (3, 5), (3, 6), (3, 11), (3, 12), (3, 17);
 
 -- -------------------------------------------------------------
--- SEED: users (admin, analyst, user)
+-- SEED: users (admin, analyst, supervisor, user)
 -- Passwords are set to 'password' (hashed using bcrypt)
 -- -------------------------------------------------------------
-INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `phone`, `department`, `job_title`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Admin User', 'admin@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567890', 'Security Operations Center', 'Chief Information Security Officer', 'active', NOW(), NOW()),
-(2, 'Analyst User', 'analyst@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567891', 'Incident Response Team', 'Senior Incident Responder', 'active', NOW(), NOW()),
-(3, 'Regular User', 'user@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567892', 'Human Resources', 'HR Specialist', 'active', NOW(), NOW());
+INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `phone`, `department`, `job_title`, `status`, `role`, `created_at`, `updated_at`) VALUES
+(1, 'Admin User', 'admin@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567890', 'Security Operations Center', 'Chief Information Security Officer', 'active', 'Admin', NOW(), NOW()),
+(2, 'Analyst User', 'analyst@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567891', 'Incident Response Team', 'Senior Incident Responder', 'active', 'Analyst', NOW(), NOW()),
+(3, 'Regular User', 'user@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567892', 'Human Resources', 'HR Specialist', 'active', 'Analyst', NOW(), NOW()),
+(4, 'Supervisor User', 'supervisor@cyberincidentsystem.com', NOW(), '$2y$10$QqT4VCIt5HD33TkqOazFhu1d1m4Fus4HUpMvwUpXepUZY4NO5Wk3G', '+1234567893', 'Security Operations Center', 'SOC Supervisor', 'active', 'Supervisor', NOW(), NOW());
 
 -- -------------------------------------------------------------
 -- SEED: role_user (Assign role to users)
@@ -472,6 +563,7 @@ INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `ph
 INSERT INTO `role_user` (`role_id`, `user_id`, `assigned_by`, `created_at`, `updated_at`) VALUES
 (1, 1, NULL, NOW(), NOW()), -- Admin User has Administrator role
 (2, 2, NULL, NOW(), NOW()), -- Analyst User has Security Analyst role
+(2, 4, NULL, NOW(), NOW()), -- Supervisor User has Security Analyst role
 (3, 3, NULL, NOW(), NOW()); -- Regular User has User role
 
 -- -------------------------------------------------------------
@@ -491,8 +583,10 @@ INSERT INTO `incident_categories` (`id`, `name`, `slug`, `description`, `is_acti
 -- SEED: incident_statuses
 -- -------------------------------------------------------------
 INSERT INTO `incident_statuses` (`id`, `name`, `slug`, `description`, `sort_order`, `is_closed`, `created_at`, `updated_at`) VALUES
-(1, 'Open', 'open', 'Newly reported incident awaiting triage.', 1, 0, NOW(), NOW()),
-(2, 'Assigned', 'assigned', 'Incident has been assigned to an analyst.', 2, 0, NOW(), NOW()),
-(3, 'In Progress', 'in_progress', 'Investigation or response is underway.', 3, 0, NOW(), NOW()),
-(4, 'Resolved', 'resolved', 'Corrective action completed and awaiting closure.', 4, 0, NOW(), NOW()),
-(5, 'Closed', 'closed', 'Incident fully closed.', 5, 1, NOW(), NOW());
+(1, 'New', 'new', 'Newly reported incident awaiting triage.', 1, 0, NOW(), NOW()),
+(2, 'Investigating', 'investigating', 'Investigation or response is underway.', 2, 0, NOW(), NOW()),
+(3, 'Contained', 'contained', 'Incident has been contained.', 3, 0, NOW(), NOW()),
+(4, 'Eradicated', 'eradicated', 'Threat has been eradicated.', 4, 0, NOW(), NOW()),
+(5, 'Recovering', 'recovering', 'Systems are recovering.', 5, 0, NOW(), NOW()),
+(6, 'Pending Review', 'pending_review', 'Awaiting supervisor approval.', 6, 0, NOW(), NOW()),
+(7, 'Closed', 'closed', 'Incident fully closed.', 7, 1, NOW(), NOW());

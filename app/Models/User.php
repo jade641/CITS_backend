@@ -30,6 +30,7 @@ class User extends Authenticatable
         'department',
         'job_title',
         'status',
+        'role',
         'last_login_at',
         'last_login_ip',
     ];
@@ -139,5 +140,15 @@ class User extends Authenticatable
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function isSocAnalyst(): bool
+    {
+        return in_array($this->role, ['Analyst', 'Supervisor', 'Admin']);
+    }
+
+    public function isSocSupervisor(): bool
+    {
+        return in_array($this->role, ['Supervisor', 'Admin']);
     }
 }

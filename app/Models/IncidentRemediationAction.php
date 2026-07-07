@@ -6,30 +6,32 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class IncidentAttachment extends Model
+class IncidentRemediationAction extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'incident_id',
-        'user_id',
-        'original_name',
-        'stored_name',
-        'disk',
-        'file_path',
-        'mime_type',
-        'file_hash',
         'description',
-        'size_bytes',
+        'owner_id',
+        'due_date',
+        'status',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'due_date' => 'date',
+        ];
+    }
 
     public function incident(): BelongsTo
     {
         return $this->belongsTo(Incident::class);
     }
 
-    public function user(): BelongsTo
+    public function owner(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'owner_id');
     }
 }

@@ -65,6 +65,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', UserController::class);
     Route::apiResource('incidents', IncidentController::class);
 
+    // SOC workflow routes
+    Route::patch('/incidents/{incident}/status', [IncidentController::class, 'updateStatus']);
+    Route::post('/incidents/{incident}/timeline', [IncidentController::class, 'saveTimeline']);
+    Route::post('/incidents/{incident}/iocs', [IncidentController::class, 'saveIocs']);
+    Route::post('/incidents/{incident}/affected-systems', [IncidentController::class, 'saveAffectedSystems']);
+    Route::post('/incidents/{incident}/actions-taken', [IncidentController::class, 'saveActionsTaken']);
+    Route::post('/incidents/{incident}/severity', [IncidentController::class, 'saveSeverity']);
+    Route::post('/incidents/{incident}/evidence', [IncidentController::class, 'uploadEvidence']);
+    Route::post('/incidents/{incident}/findings', [IncidentController::class, 'saveFindings']);
+    Route::post('/incidents/{incident}/remediation-actions', [IncidentController::class, 'saveRemediationActions']);
+    Route::post('/incidents/{incident}/submit-resolution', [IncidentController::class, 'submitResolution']);
+    Route::post('/incidents/{incident}/review', [IncidentController::class, 'reviewIncident']);
+    Route::get('/incidents/{incident}/audit-log', [IncidentController::class, 'getAuditLog']);
+
     Route::post('/incidents/{incident}/assignments', [IncidentAssignmentController::class, 'store']);
     Route::post('/incidents/{incident}/status', [IncidentStatusController::class, 'store']);
     Route::post('/incidents/{incident}/comments', [IncidentCommentController::class, 'store']);

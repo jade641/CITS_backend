@@ -24,10 +24,21 @@ class Incident extends Model
         'reporter_id',
         'current_assignee_id',
         'affected_asset',
+        'confidentiality_impact',
+        'integrity_impact',
+        'availability_impact',
+        'affected_systems_count',
+        'data_sensitivity',
+        'severity_override',
+        'severity_override_justification',
         'source_ip',
         'location',
         'impact_summary',
         'resolution_notes',
+        'root_cause_category',
+        'root_cause_explanation',
+        'lessons_learned',
+        'rejection_reason',
         'occurred_at',
         'reported_at',
         'resolved_at',
@@ -41,6 +52,7 @@ class Incident extends Model
         'reported_at' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
+        'severity_override' => 'boolean',
     ];
 
     public function category(): BelongsTo
@@ -91,5 +103,30 @@ class Incident extends Model
     public function history(): HasMany
     {
         return $this->hasMany(IncidentHistory::class);
+    }
+
+    public function timelines(): HasMany
+    {
+        return $this->hasMany(IncidentTimeline::class);
+    }
+
+    public function iocs(): HasMany
+    {
+        return $this->hasMany(IncidentIoc::class);
+    }
+
+    public function affectedSystems(): HasMany
+    {
+        return $this->hasMany(IncidentAffectedSystem::class);
+    }
+
+    public function actionsTaken(): HasMany
+    {
+        return $this->hasMany(IncidentActionTaken::class);
+    }
+
+    public function remediationActions(): HasMany
+    {
+        return $this->hasMany(IncidentRemediationAction::class);
     }
 }
