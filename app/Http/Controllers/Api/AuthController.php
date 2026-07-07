@@ -36,11 +36,6 @@ class AuthController extends Controller
             return $user;
         });
 
-        Auth::login($user);
-        if ($request->hasSession()) {
-            $request->session()->regenerate();
-        }
-
         $user->forceFill([
             'last_login_at' => now(),
             'last_login_ip' => $request->ip(),
@@ -48,9 +43,12 @@ class AuthController extends Controller
 
         $this->auditLogService->log($user, 'auth.registered', $user, ['email' => $user->email], $request);
 
+        $token = $user->createToken('auth-token')->plainTextToken;
+
         return response()->json([
             'message' => 'Registration successful.',
             'user' => $user->load('roles.permissions'),
+            'token' => $token,
         ], 201);
     }
 
@@ -64,12 +62,11 @@ class AuthController extends Controller
             ]);
         }
 
-        if ($request->hasSession()) {
-            $request->session()->regenerate();
-        }
-
         /** @var User $user */
-        $user = $request->user();
+        $user = Auth::user();
+
+        // Revoke all existing tokens for this user to keep things clean
+        $user->tokens()->delete();
 
         $user->forceFill([
             'last_login_at' => now(),
@@ -78,9 +75,12 @@ class AuthController extends Controller
 
         $this->auditLogService->log($user, 'auth.login', $user, ['email' => $user->email], $request);
 
+        $token = $user->createToken('auth-token')->plainTextToken;
+
         return response()->json([
             'message' => 'Login successful.',
             'user' => $user->load('roles.permissions'),
+            'token' => $token,
         ]);
     }
 
@@ -103,13 +103,8 @@ class AuthController extends Controller
 
         if ($user) {
             $this->auditLogService->log($user, 'auth.logout', $user, ['email' => $user->email], $request);
-        }
-
-        Auth::guard('web')->logout();
-
-        if ($request->hasSession()) {
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+            // Revoke the current token used for this request
+            $user->currentAccessToken()->delete();
         }
 
         return response()->json([
